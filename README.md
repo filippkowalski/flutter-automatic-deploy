@@ -230,6 +230,10 @@ export APP_STORE_API_KEY_ID=YOUR_KEY_ID
 export APP_STORE_ISSUER_ID=YOUR_ISSUER_ID
 ```
 
+## Community Forks
+
+- [Dart Version](https://github.com/Indy9000/flutter-automatic-deploy) by [@Indy9000](https://github.com/Indy9000) - A pure Dart implementation of this tool
+
 ## License
 
 MIT License - feel free to use in your projects!
