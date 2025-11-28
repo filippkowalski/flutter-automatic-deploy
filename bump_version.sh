@@ -332,7 +332,12 @@ fi
 if [ "$DRY_RUN" = false ]; then
   echo ""
   echo -e "${CYAN}Updating pubspec.yaml...${NC}"
-  sed -i '' "s/^version: .*/version: $NEW_VERSION/" "$PUBSPEC_PATH"
+  # Cross-platform sed: macOS requires -i '', Linux/Git Bash uses -i or -i.bak
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s/^version: .*/version: $NEW_VERSION/" "$PUBSPEC_PATH"
+  else
+    sed -i.bak "s/^version: .*/version: $NEW_VERSION/" "$PUBSPEC_PATH" && rm -f "${PUBSPEC_PATH}.bak"
+  fi
 
   NEW_VERSION_CHECK=$(grep "^version: " "$PUBSPEC_PATH" | sed 's/version: //' | xargs)
   if [ "$NEW_VERSION_CHECK" == "$NEW_VERSION" ]; then
