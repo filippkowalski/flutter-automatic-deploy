@@ -15,7 +15,7 @@
 # =============================================================================
 #
 # Usage:
-#   bump_version [major|minor|patch|build] [--release] [--skip-ios] [--skip-android] [--dry-run]
+#   bump_version [major|minor|patch|build] [--release] [--skip-ios] [--skip-android] [--skip-changelog] [--dry-run]
 #   bump_version 1.14.0+31 [options]
 #
 # Examples:
@@ -51,6 +51,7 @@ CREATE_TAG=true
 PUSH_TAG=false
 AUTO_COMMIT=false
 SKIP_SUBMIT=false
+SKIP_CHANGELOG=false
 
 for arg in "$@"; do
   case $arg in
@@ -83,6 +84,9 @@ for arg in "$@"; do
     --skip-submit)
       SKIP_SUBMIT=true
       ;;
+    --skip-changelog)
+      SKIP_CHANGELOG=true
+      ;;
     --help|-h)
       echo "Flutter Automatic Deploy - Universal Version Bumper"
       echo "Built by Filip Kowalski | @filippkowalski | fkowalski.com"
@@ -104,6 +108,7 @@ for arg in "$@"; do
       echo "  --no-tag           Skip git tag creation"
       echo "  --commit           Auto-commit version changes"
       echo "  --skip-submit      Skip automatic App Store submission (iOS only)"
+      echo "  --skip-changelog   Skip changelog generation"
       echo "  --dry-run          Preview changes without modifying files"
       echo "  --help, -h         Show this help message"
       echo ""
@@ -248,7 +253,7 @@ echo -e "${BLUE}New version:     ${GREEN}$NEW_VERSION${NC}"
 
 # Generate changelog from git commits
 CHANGELOG_CONTENT=""
-if [ -n "$GIT_ROOT" ]; then
+if [ -n "$GIT_ROOT" ] && [ "$SKIP_CHANGELOG" = false ]; then
   echo ""
   echo -e "${CYAN}Generating changelog from git commits...${NC}"
 
@@ -312,6 +317,9 @@ if [ -n "$GIT_ROOT" ]; then
   echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "$CHANGELOG_CONTENT" | head -20
   echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+elif [ "$SKIP_CHANGELOG" = true ]; then
+  echo ""
+  echo -e "${YELLOW}Skipping changelog generation (--skip-changelog)${NC}"
 fi
 
 # Confirmation
@@ -345,7 +353,7 @@ fi
 
 # Update CHANGELOG.md
 CHANGELOG_PATH="$GIT_ROOT/CHANGELOG.md"
-if [ -n "$CHANGELOG_CONTENT" ] && [ -f "$CHANGELOG_PATH" ]; then
+if [ -n "$CHANGELOG_CONTENT" ] && [ -f "$CHANGELOG_PATH" ] && [ "$SKIP_CHANGELOG" = false ]; then
   if [ "$DRY_RUN" = false ]; then
     echo -e "${CYAN}Updating CHANGELOG.md...${NC}"
 
@@ -366,6 +374,8 @@ if [ -n "$CHANGELOG_CONTENT" ] && [ -f "$CHANGELOG_PATH" ]; then
   else
     echo -e "${CYAN}[DRY RUN] Would update CHANGELOG.md${NC}"
   fi
+elif [ "$SKIP_CHANGELOG" = true ] && [ "$DRY_RUN" = true ]; then
+  echo -e "${CYAN}[DRY RUN] Would skip CHANGELOG.md update (--skip-changelog)${NC}"
 fi
 
 # Auto-commit changes if requested OR if releasing (release requires committed changes for proper tagging)
@@ -375,14 +385,22 @@ if ( [ "$AUTO_COMMIT" = true ] || [ "$RUN_RELEASE" = true ] ) && [ "$DRY_RUN" = 
 
   cd "$GIT_ROOT"
   git add "$PUBSPEC_PATH"
-  [ -f "$CHANGELOG_PATH" ] && git add "$CHANGELOG_PATH"
+  [ -f "$CHANGELOG_PATH" ] && [ "$SKIP_CHANGELOG" = false ] && git add "$CHANGELOG_PATH"
 
-  git commit -m "chore: bump version to v$NEW_VERSION
+  COMMIT_MESSAGE="chore: bump version to v$NEW_VERSION
 
-- Updated version in pubspec.yaml
-- Generated changelog from git commits
+- Updated version in pubspec.yaml"
+  
+  if [ "$SKIP_CHANGELOG" = false ]; then
+    COMMIT_MESSAGE="${COMMIT_MESSAGE}
+- Generated changelog from git commits"
+  fi
+  
+  COMMIT_MESSAGE="${COMMIT_MESSAGE}
 
 Generated with flutter-automatic-deploy"
+
+  git commit -m "$COMMIT_MESSAGE"
 
   echo -e "${GREEN}✓ Changes committed${NC}"
 fi
@@ -399,9 +417,13 @@ if [ "$CREATE_TAG" = true ] && [ "$DRY_RUN" = false ] && [ -n "$GIT_ROOT" ]; the
     echo -e "${YELLOW}Warning: Tag v$NEW_VERSION already exists, skipping${NC}"
   else
     # Create annotated tag with changelog
-    TAG_MESSAGE="Release v$NEW_VERSION
+    if [ -n "$CHANGELOG_CONTENT" ] && [ "$SKIP_CHANGELOG" = false ]; then
+      TAG_MESSAGE="Release v$NEW_VERSION
 
 $(echo -e "$CHANGELOG_CONTENT" | sed 's/^## \[.*\] - .*$//' | sed '/^$/d' | head -20)"
+    else
+      TAG_MESSAGE="Release v$NEW_VERSION"
+    fi
 
     git tag -a "v$NEW_VERSION" -m "$TAG_MESSAGE"
     echo -e "${GREEN}✓ Created tag: v$NEW_VERSION${NC}"
@@ -698,7 +720,11 @@ else
   if [ "$DRY_RUN" = false ]; then
     echo ""
     echo -e "${CYAN}Next steps:${NC}"
-    echo -e "  ${BLUE}1.${NC} Review changes in pubspec.yaml and CHANGELOG.md"
+    if [ "$SKIP_CHANGELOG" = false ]; then
+      echo -e "  ${BLUE}1.${NC} Review changes in pubspec.yaml and CHANGELOG.md"
+    else
+      echo -e "  ${BLUE}1.${NC} Review changes in pubspec.yaml"
+    fi
 
     if [ "$AUTO_COMMIT" = false ]; then
       echo -e "  ${BLUE}2.${NC} Commit: ${YELLOW}git add . && git commit -m \"chore: bump version to v$NEW_VERSION\"${NC}"
