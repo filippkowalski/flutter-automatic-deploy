@@ -138,6 +138,7 @@ bump_version patch --dry-run
 | `--skip-ios` | Skip iOS build |
 | `--skip-android` | Skip Android build |
 | `--skip-submit` | Upload iOS without auto-submission |
+| `--skip-changelog` | Skip changelog generation |
 | `--commit` | Auto-commit version changes |
 | `--push-tag` | Create and push git tag |
 | `--no-tag` | Skip git tag creation |
